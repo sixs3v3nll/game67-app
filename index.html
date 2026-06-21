@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>67</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+/* ═══ ПЕРЕМЕННЫЕ ════════════════════════════════════════════════════ */
+:root {
+  --bg:  #0d0d0d; --bg2: #151515; --bg3: #1d1d1d; --bg4: #252525;
+  --tx:  #e6e6e6; --tx2: #737373; --tx3: #3d3d3d;
+  --bd:  #222;    --bd2: #333;
+  --ok:  #4caf72; --err: #c44;
+  --cbk: #080808; --cfc: #181818;
+  --cw:  64px;    --ch:  90px;    --r: 8px;
+}
+[data-theme=light] {
+  --bg:#f0efeb; --bg2:#e8e7e3; --bg3:#deded9; --bg4:#d0cfc9;
+  --tx:#111;    --tx2:#555;    --tx3:#aaa;
+  --bd:#ccc;    --bd2:#bbb;
+  --cbk:#111;   --cfc:#fafafa;
+}
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+html, body {
+  height:100%; overflow:hidden;
+  background:var(--bg); color:var(--tx);
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;
+  -webkit-tap-highlight-color:transparent;
+}
+button { font-family:inherit; cursor:pointer; }
+#app { width:100%; height:100dvh; display:flex; flex-direction:column; position:relative; }
+
+/* ═══ ЭКРАНЫ ════════════════════════════════════════════════════════ */
+.scr { display:none; flex-direction:column; height:100%; align-items:center; justify-content:center; }
+.scr.on { display:flex; }
+#sgame { display:none; flex-direction:column; height:100%; }
+#sgame.on { display:flex; }
+
+/* ═══ КНОПКА ТЕМЫ ═══════════════════════════════════════════════════ */
+.tbtn {
+  position:fixed; top:12px; right:12px; z-index:200;
+  background:none; border:1px solid var(--bd2); color:var(--tx2);
+  width:32px; height:32px; border-radius:50%; font-size:14px;
+  display:flex; align-items:center; justify-content:center;
+}
+.tbtn:active { opacity:.6; }
+
+/* ═══ ЛОББИ ═════════════════════════════════════════════════════════ */
+.logo     { font-size:108px; font-weight:100; letter-spacing:-8px; line-height:1; color:#fff; }
+.logo-sub { font-size:11px; letter-spacing:4px; color:var(--tx3); margin:6px 0 56px; }
+.main-btn {
+  background:var(--bg3); border:1px solid var(--bd2); color:var(--tx);
+  padding:15px 60px; border-radius:var(--r); font-size:15px; letter-spacing:.3px;
+}
+.main-btn:active { opacity:.6; }
+
+/* ═══ ПОИСК ═════════════════════════════════════════════════════════ */
+.spin {
+  width:28px; height:28px; border:2px solid var(--bd2); border-top-color:var(--tx2);
+  border-radius:50%; animation:spin .7s linear infinite; margin-bottom:18px;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+.conn-lbl { font-size:12px; color:var(--tx3); letter-spacing:2px; text-transform:uppercase; }
+
+/* ═══ КОМНАТА ═══════════════════════════════════════════════════════ */
+#sroom { justify-content:flex-start; }
+.room-hd { width:100%; padding:14px 20px 12px; border-bottom:1px solid var(--bd); text-align:center; }
+.room-lbl { font-size:10px; color:var(--tx3); letter-spacing:3px; text-transform:uppercase; }
+.room-id  { font-size:20px; color:var(--tx2); font-weight:300; margin-top:3px; }
+.p-grid   { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:18px; width:100%; }
+.p-slot   {
+  background:var(--bg2); border:1px solid var(--bd); border-radius:var(--r);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:10px; padding:22px 12px; min-height:112px; transition:border-color .25s;
+}
+.p-slot.rdy { border-color:var(--ok); }
+.p-slot.emp { opacity:.28; }
+.p-av  { width:40px; height:40px; background:var(--bg4); border-radius:4px; transition:background .25s; }
+.p-slot.rdy .p-av { background:var(--ok); }
+.p-st  { font-size:11px; color:var(--tx3); transition:color .25s; }
+.p-slot.rdy .p-st { color:var(--ok); }
+.room-ft { width:100%; padding:14px 18px; border-top:1px solid var(--bd); display:flex; flex-direction:column; gap:9px; margin-top:auto; }
+.rdy-btn { background:var(--bg3); border:1px solid var(--bd2); color:var(--tx); padding:14px; border-radius:var(--r); font-size:15px; text-align:center; transition:all .2s; }
+.rdy-btn.on { border-color:var(--ok); color:var(--ok); }
+.rdy-btn:active { opacity:.6; }
+.leave-lnk { color:var(--tx3); font-size:12px; text-align:center; cursor:pointer; padding:6px; }
+
+/* ═══ ОТКРЫТИЕ КАРТЫ ════════════════════════════════════════════════ */
+.rv-lbl  { font-size:10px; color:var(--tx3); letter-spacing:3px; text-transform:uppercase; margin-bottom:30px; }
+.rv-wrap { perspective:700px; margin-bottom:32px; }
+.rv-card {
+  width:108px; height:152px; transform-style:preserve-3d;
+  animation:flipC 1s cubic-bezier(.35,0,.2,1) forwards; animation-delay:.3s;
+}
+@keyframes flipC { 0%{transform:rotateY(0)} 100%{transform:rotateY(180deg)} }
+.rv-face { position:absolute; inset:0; backface-visibility:hidden; border-radius:12px; }
+.rv-back { background:var(--cbk); border:1px solid var(--bd); }
+.rv-front {
+  background:var(--cfc); border:1px solid var(--bd2); transform:rotateY(180deg);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+}
+.rv-rank { font-size:34px; font-weight:200; color:var(--tx); }
+.rv-suit { font-size:46px; line-height:1; color:#fff; }
+.rv-desc { font-size:14px; color:var(--tx2); text-align:center; max-width:240px; line-height:1.6; padding:0 24px; }
+.rv-btn  {
+  background:var(--bg3); border:1px solid var(--bd2); color:var(--tx);
+  padding:13px 50px; border-radius:var(--r); font-size:14px;
+  opacity:0; animation:fdin .3s forwards; animation-delay:1.5s; margin-top:20px;
+}
+@keyframes fdin { to { opacity:1; } }
+.rv-btn:active { opacity:.6; }
+
+/* ═══ ИГРА — ШАПКА ══════════════════════════════════════════════════ */
+.g-top {
+  padding:7px 13px; display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid var(--bd); min-height:42px; flex-shrink:0;
+}
+.g-turn  { font-size:12px; color:var(--tx3); }
+.g-turn b{ color:var(--tx); font-weight:500; }
+.g-dir   { font-size:20px; }
+.g-pile  { font-size:11px; color:var(--tx3); }
+
+/* ═══ ОППОНЕНТЫ ══════════════════════════════════════════════════════ */
+.opp-area {
+  display:flex; justify-content:space-around; align-items:center;
+  padding:7px 12px; gap:6px; flex-shrink:0; border-bottom:1px solid var(--bd);
+}
+.opp-wrap { display:flex; flex-direction:column; align-items:center; gap:5px; flex:1; }
+.opp-fan  { display:flex; justify-content:center; height:28px; }
+.opp-mini {
+  width:17px; height:26px; background:var(--cbk); border:1px solid var(--bd);
+  border-radius:3px; margin-left:-7px; flex-shrink:0;
+}
+.opp-mini:first-child { margin-left:0; }
+.opp-av   {
+  width:30px; height:30px; background:var(--bg3); border:1px solid var(--bd);
+  border-radius:4px; font-size:12px; color:var(--tx3);
+  display:flex; align-items:center; justify-content:center; transition:border-color .2s;
+}
+.opp-av.cur { border-color:#fff; }
+.opp-cnt  { font-size:10px; color:var(--tx3); }
+
+/* ═══ СТОЛ ═══════════════════════════════════════════════════════════ */
+.table-area  { flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+.table-inner { display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; padding:10px; }
+.empty-msg   { font-size:11px; color:var(--tx3); letter-spacing:2px; }
+
+/* ═══ РУКА ИГРОКА ════════════════════════════════════════════════════ */
+.hand-area { border-top:1px solid var(--bd); padding:7px 10px 10px; flex-shrink:0; }
+.hand-meta { display:flex; justify-content:space-between; align-items:center; padding:0 3px 6px; }
+.t-badge   {
+  font-size:11px; color:var(--tx3); padding:3px 7px;
+  border:1px solid transparent; border-radius:4px; transition:all .18s; letter-spacing:.5px;
+}
+.t-badge.on { color:#fff; border-color:#fff; }
+.hand-cnt   { font-size:11px; color:var(--tx3); }
+.hand-scroll {
+  display:flex; flex-wrap:nowrap; overflow-x:auto; gap:6px;
+  padding:2px 3px 6px; scrollbar-width:none; align-items:flex-end;
+  min-height:calc(var(--ch) + 12px);
+}
+.hand-scroll::-webkit-scrollbar { display:none; }
+
+/* ═══ КАРТА ══════════════════════════════════════════════════════════ */
+.card {
+  width:var(--cw); min-width:var(--cw); height:var(--ch);
+  background:var(--cfc); border:1px solid var(--bd2); border-radius:var(--r);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:3px; flex-shrink:0; position:relative; user-select:none;
+  transition:transform .13s, border-color .13s, opacity .13s;
+}
+.card .ck { font-size:19px; font-weight:200; color:var(--tx); line-height:1; }
+.card .cs { font-size:30px; line-height:1; color:#ffffff; }
+
+/* Типы карт */
+.card.trump { border-color:rgba(180,50,50,.45); }
+.card.dp    { border-color:rgba(210,185,80,.55); }
+
+/* В руке */
+.card.hand  { cursor:pointer; }
+.card.hand:active { transform:translateY(-4px); }
+.card.sel   { transform:translateY(-14px) !important; border-color:#fff; }
+.card.dim   { opacity:.25; pointer-events:none; }
+
+/* На столе */
+.card.on-table { cursor:default; pointer-events:none; animation:dealIn .2s ease-out; }
+@keyframes dealIn { from{transform:translateY(-12px) scale(.91);opacity:0} to{transform:none;opacity:1} }
+
+/* ═══ КНОПКИ ДЕЙСТВИЙ ═══════════════════════════════════════════════ */
+.act-row { display:flex; gap:7px; padding:5px 3px 2px; }
+.act-btn {
+  flex:1; padding:11px 6px; background:var(--bg2); border:1px solid var(--bd);
+  border-radius:var(--r); color:var(--tx2); font-size:13px; text-align:center;
+  transition:all .15s;
+}
+.act-btn:active { opacity:.6; }
+.act-btn.pri    { border-color:#fff; color:#fff; }
+.act-btn:disabled { opacity:.2; pointer-events:none; }
+
+/* ═══ ЛЕТЯЩАЯ КАРТА (анимация броска) ═══════════════════════════════ */
+.fly-card {
+  position:fixed; pointer-events:none; z-index:900;
+  width:var(--cw); height:var(--ch);
+  background:var(--cfc); border:1px solid var(--bd2); border-radius:var(--r);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  will-change:transform, opacity;
+}
+.fly-card .ck { font-size:19px; font-weight:200; color:var(--tx); }
+.fly-card .cs { font-size:30px; line-height:1; color:#fff; }
+.fly-card.trump { border-color:rgba(180,50,50,.5); }
+.fly-card.dp    { border-color:rgba(210,185,80,.6); }
+
+/* ═══ ЭФФЕКТЫ СТОЛA ══════════════════════════════════════════════════ */
+/* Вспышка при покрытии */
+@keyframes cglow {
+  0%  { box-shadow:0 0 0 4px rgba(255,255,255,.4); }
+  100%{ box-shadow:0 0 0 0   rgba(255,255,255,0); }
+}
+.cglow { animation:cglow .5s ease-out; }
+
+/* Обычный сброс в биту */
+@keyframes flushOut {
+  0%  { transform:scale(1); opacity:1; }
+  40% { transform:scale(1.08); }
+  100%{ transform:scale(.25) translateY(-30px); opacity:0; }
+}
+.flush-out { animation:flushOut .35s ease-in forwards; }
+
+/* Д+ — мощный сброс */
+@keyframes megaFlush {
+  0%  { transform:scale(1); }
+  20% { transform:scale(1.15) rotate(-4deg); }
+  45% { transform:scale(1.15) rotate(4deg); }
+  70% { transform:scale(1.07); }
+  100%{ transform:scale(.15) translateY(-50px); opacity:0; }
+}
+.mega-flush { animation:megaFlush .5s ease-in forwards; }
+
+/* Поднятие стола */
+@keyframes pickupOut {
+  0%  { transform:translateX(0); opacity:1; }
+  100%{ transform:translateX(60px) scale(.8); opacity:0; }
+}
+.pickup-out { animation:pickupOut .3s ease-in forwards; }
+
+/* Переворот стрелки */
+@keyframes dirFlip {
+  0%  { transform:scale(1); }
+  40% { transform:scale(1.6) rotate(180deg); }
+  100%{ transform:scale(1) rotate(360deg); }
+}
+.dir-flip { animation:dirFlip .45s ease-out; }
+
+/* ═══ ОВЕРЛЕЙ «ЧЕМ КРЫЛИ» ═══════════════════════════════════════════ */
+.cov-lay {
+  position:fixed; inset:0; z-index:500; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:12px;
+  pointer-events:none; opacity:0; transition:opacity .15s;
+  background:rgba(0,0,0,.5);
+}
+.cov-lay.on { opacity:1; }
+.cov-row    { display:flex; align-items:center; gap:14px; }
+.cov-arr    { font-size:26px; color:var(--tx2); }
+.cov-card   {
+  width:76px; height:106px; background:var(--cfc); border:1px solid var(--bd2);
+  border-radius:10px; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:5px;
+}
+.cov-card .ck { font-size:22px; font-weight:200; color:var(--tx); }
+.cov-card .cs { font-size:34px; line-height:1; color:#fff; }
+.cov-card.trump { border-color:rgba(180,50,50,.55); }
+.cov-card.dp    { border-color:rgba(210,185,80,.65); }
+.cov-lbl { font-size:13px; color:var(--tx2); letter-spacing:.5px; text-align:center; max-width:280px; padding:0 20px; }
+
+/* ═══ КОНЕЦ ИГРЫ ═════════════════════════════════════════════════════ */
+#sgameover .go-title { font-size:10px; color:var(--tx3); letter-spacing:3px; text-transform:uppercase; }
+#sgameover .go-res   { font-size:68px; font-weight:100; letter-spacing:-4px; margin:10px 0 6px; }
+#sgameover .go-res.win  { color:var(--ok); }
+#sgameover .go-res.lose { color:var(--err); }
+#sgameover .go-sub   { font-size:14px; color:var(--tx2); }
+
+/* ═══ ТОСТ ═══════════════════════════════════════════════════════════ */
+.toast {
+  position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
+  background:var(--bg4); border:1px solid var(--bd2); color:var(--tx);
+  padding:9px 20px; border-radius:var(--r); font-size:13px; z-index:1000;
+  opacity:0; transition:opacity .18s; pointer-events:none;
+  white-space:nowrap; max-width:92vw; text-align:center;
+}
+.toast.on { opacity:1; }
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ЛОББИ -->
+<div id="slobby" class="scr on">
+  <div class="logo">67</div>
+  <div class="logo-sub">карточная игра</div>
+  <button class="main-btn" onclick="G.search()">Поиск комнаты</button>
+</div>
+
+<!-- ПОИСК/ПОДКЛЮЧЕНИЕ -->
+<div id="sconn" class="scr">
+  <div class="spin"></div>
+  <div class="conn-lbl" id="conn-lbl">Подключение...</div>
+</div>
+
+<!-- КОМНАТА -->
+<div id="sroom" class="scr">
+  <div class="room-hd">
+    <div class="room-lbl">Комната</div>
+    <div class="room-id" id="room-id">—</div>
+  </div>
+  <div class="p-grid" id="p-grid"></div>
+  <div class="room-ft">
+    <div class="rdy-btn" id="rdy-btn" onclick="G.toggleReady()">Готов</div>
+    <div class="leave-lnk" onclick="G.leave()">Покинуть</div>
+  </div>
+</div>
+
+<!-- ОТКРЫТАЯ КАРТА -->
+<div id="sreveal" class="scr">
+  <div class="rv-lbl">Первый ход</div>
+  <div class="rv-wrap">
+    <div class="rv-card">
+      <div class="rv-face rv-back"></div>
+      <div class="rv-face rv-front">
+        <div class="rv-rank" id="rv-rank"></div>
+        <div class="rv-suit" id="rv-suit"></div>
+      </div>
+    </div>
+  </div>
+  <div class="rv-desc" id="rv-desc"></div>
+  <button class="rv-btn" onclick="G.confirmReveal()">Начать игру</button>
+</div>
+
+<!-- ИГРА -->
+<div id="sgame">
+  <div class="g-top">
+    <div class="g-turn">Ход: <b id="g-who">—</b></div>
+    <div class="g-dir" id="g-dir">↺</div>
+    <div class="g-pile" id="g-pile"></div>
+  </div>
+  <div class="opp-area" id="opp-area"></div>
+  <div class="table-area">
+    <div class="table-inner" id="table-inner">
+      <div class="empty-msg">— стол пуст —</div>
+    </div>
+  </div>
+  <div class="hand-area">
+    <div class="hand-meta">
+      <div class="t-badge" id="t-badge">Ваш ход</div>
+      <div class="hand-cnt" id="hand-cnt"></div>
+    </div>
+    <div class="hand-scroll" id="hand-scroll"></div>
+    <div class="act-row" id="act-row"></div>
+  </div>
+</div>
+
+<!-- КОНЕЦ ИГРЫ -->
+<div id="sgameover" class="scr">
+  <div class="go-title">Игра окончена</div>
+  <div class="go-res" id="go-res"></div>
+  <div class="go-sub" id="go-sub"></div>
+  <button class="main-btn" style="margin-top:36px" onclick="G.toLobby()">В меню</button>
+</div>
+
+<!-- ОВЕРЛЕЙ -->
+<div class="cov-lay" id="cov-lay">
+  <div class="cov-row" id="cov-row"></div>
+  <div class="cov-lbl" id="cov-lbl"></div>
+</div>
+
+<button class="tbtn" onclick="G.toggleTheme()">◐</button>
+<div class="toast" id="toast"></div>
+</div><!-- /#app -->
+
+<script>
+// ════════════════════════════════════════════════════════════════════
+//  ⚠️  ЗАМЕНИТЕ НА ВАШ URL СЕРВЕРА С RAILWAY  ⚠️
+//  Формат: wss://ВАШ-ДОМЕН.up.railway.app
+// ════════════════════════════════════════════════════════════════════
+const WS_URL = 'wss://ЗАМЕНИТЕ-ЭТО.up.railway.app';
+
+// ════════════════════════════════════════════════════════════════════
+//  ПРАВИЛА (клиентская копия — только для подсветки карт)
+// ════════════════════════════════════════════════════════════════════
+const RP = {'6':0,'В':1,'Д':2,'К':3,'Т':4,'7':5,'8':6};
+
+function isTrump(c)  { return c && c.suit === '♚'; }
+function isDPlus(c)  { return c && c.rank === 'Д' && c.suit === '+'; }
+function cardCls(c)  { return isDPlus(c) ? 'dp' : isTrump(c) ? 'trump' : ''; }
+
+function canPlay(att, def) {
+  if (!att) return true;
+  if (isDPlus(def)) return true;
+  if (att.rank === '7' && def.rank === '6') return false;
+  if (att.suit === '+') return def.suit === '+' && RP[def.rank] > RP[att.rank];
+  if (def.rank === '6') {
+    if (att.suit === '+' || att.rank === '7') return false;
+    if (def.suit === '♚') return true;
+    return def.suit === att.suit;
+  }
+  if (att.suit === '♚') return def.suit === '♚' && RP[def.rank] > RP[att.rank];
+  if (def.suit === att.suit) return RP[def.rank] > RP[att.rank];
+  if (def.suit === '♚') return true;
+  return false;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  УТИЛИТЫ
+// ════════════════════════════════════════════════════════════════════
+let _toastT;
+function toast(msg, ms = 2500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('on');
+  clearTimeout(_toastT);
+  _toastT = setTimeout(() => el.classList.remove('on'), ms);
+}
+
+function showScr(id) {
+  document.querySelectorAll('.scr, #sgame').forEach(s => s.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+}
+
+function setConnLabel(txt) {
+  const el = document.getElementById('conn-lbl');
+  if (el) el.textContent = txt;
+  console.log('[67]', txt);
+}
+
+// Оверлей «чем крыли»
+let _covT;
+function showCoverOverlay(att, def, lbl) {
+  function mini(c) {
+    if (!c) return '';
+    return `<div class="cov-card ${cardCls(c)}">
+      <div class="ck">${c.rank}</div><div class="cs">${c.suit}</div>
+    </div>`;
+  }
+  const row = document.getElementById('cov-row');
+  row.innerHTML = att
+    ? mini(att) + `<div class="cov-arr">→</div>` + mini(def)
+    : mini(def);
+  document.getElementById('cov-lbl').textContent = lbl || '';
+  const lay = document.getElementById('cov-lay');
+  lay.classList.add('on');
+  clearTimeout(_covT);
+  _covT = setTimeout(() => lay.classList.remove('on'), 1800);
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  ГЛАВНЫЙ ОБЪЕКТ ИГРЫ
+// ════════════════════════════════════════════════════════════════════
+const G = {
+  ws:      null,
+  st:      null,   // текущий game_state
+  myIdx:   -1,
+  sel:     null,   // выбранная карта (индекс)
+  isReady: false,
+  isDark:  true,
+  userId:  null,
+  name:    null,
+
+  // ── ИНИЦИАЛИЗАЦИЯ ─────────────────────────────────────────────
+  init() {
+    const twa = window.Telegram?.WebApp;
+    if (twa) {
+      twa.expand();
+      twa.ready();
+      const u = twa.initDataUnsafe?.user;
+      this.userId = String(u?.id ?? Math.random().toString(36).slice(2));
+      this.name   = u?.first_name ?? 'Игрок';
+    } else {
+      this.userId = 'u' + Math.random().toString(36).slice(2, 8);
+      this.name   = 'Игрок';
+    }
+  },
+
+  toggleTheme() {
+    this.isDark = !this.isDark;
+    document.documentElement.setAttribute('data-theme', this.isDark ? 'dark' : 'light');
+  },
+
+  // ── WEBSOCKET ─────────────────────────────────────────────────
+  connect(onOpen) {
+    if (this.ws) { try { this.ws.close(); } catch(e){} this.ws = null; }
+    showScr('sconn');
+    setConnLabel('Подключение к серверу...');
+
+    let ws;
+    try { ws = new WebSocket(WS_URL); }
+    catch(e) {
+      setConnLabel('Ошибка: ' + e.message);
+      setTimeout(() => showScr('slobby'), 2500);
+      return;
+    }
+    this.ws = ws;
+
+    // Таймаут подключения
+    const timer = setTimeout(() => {
+      if (ws.readyState !== 1) {
+        setConnLabel('Сервер недоступен. Проверьте Railway.');
+        try { ws.close(); } catch(e) {}
+        setTimeout(() => showScr('slobby'), 3000);
+      }
+    }, 8000);
+
+    ws.onopen = () => {
+      clearTimeout(timer);
+      setConnLabel('Соединение установлено');
+      onOpen(ws);
+    };
+
+    ws.onmessage = e => {
+      try { this.onMsg(JSON.parse(e.data)); }
+      catch(err) { console.error('[67] parse error', err); }
+    };
+
+    ws.onerror = () => {
+      clearTimeout(timer);
+      setConnLabel('Ошибка соединения');
+      setTimeout(() => showScr('slobby'), 2500);
+    };
+
+    ws.onclose = e => {
+      console.log('[67] closed code=' + e.code);
+      if (this.st?.phase === 'playing') toast('Соединение потеряно');
+    };
+  },
+
+  send(obj) {
+    if (this.ws?.readyState === 1)
+      this.ws.send(JSON.stringify(obj));
+    else
+      console.warn('[67] send skipped, state=', this.ws?.readyState);
+  },
+
+  // ── ОБРАБОТКА СООБЩЕНИЙ ───────────────────────────────────────
+  onMsg(m) {
+    console.log('[67] msg:', m.type);
+    switch (m.type) {
+
+      case 'joined':
+        this.myIdx = m.yourIndex;
+        document.getElementById('room-id').textContent = m.roomId;
+        showScr('sroom');
+        break;
+
+      case 'room_update':
+        this.myIdx = m.yourIndex;
+        this.renderRoom(m.players);
+        break;
+
+      case 'game_state':
+        this.myIdx = m.myIndex;
+        this.st    = m;
+        if (m.phase === 'reveal')   this.showReveal();
+        else if (m.phase === 'playing')  this.renderGame();
+        else if (m.phase === 'gameover') this.showGameOver();
+        break;
+
+      case 'game_event':
+        this.handleEvent(m.event);
+        break;
+
+      case 'error':
+        toast(m.reason);
+        break;
+
+      case 'player_left':
+        toast('Игрок покинул игру');
+        break;
+    }
+  },
+
+  // ── ЛОББИ ────────────────────────────────────────────────────
+  search() {
+    this.connect(ws => {
+      setConnLabel('Поиск комнаты...');
+      ws.send(JSON.stringify({ type:'join', userId:this.userId, name:this.name }));
+    });
+  },
+
+  // ── КОМНАТА ───────────────────────────────────────────────────
+  renderRoom(players) {
+    let html = '';
+    for (let i = 0; i < 4; i++) {
+      const p = players[i];
+      if (p) {
+        html += `<div class="p-slot${p.ready?' rdy':''}">
+          <div class="p-av"></div>
+          <div class="p-st">${p.ready ? 'Готов' : 'Не готов'}</div>
+        </div>`;
+      } else {
+        html += `<div class="p-slot emp"><div class="p-av"></div><div class="p-st">Ожидание</div></div>`;
+      }
+    }
+    document.getElementById('p-grid').innerHTML = html;
+  },
+
+  toggleReady() {
+    this.isReady = !this.isReady;
+    const b = document.getElementById('rdy-btn');
+    b.textContent = this.isReady ? 'Не готов' : 'Готов';
+    b.classList.toggle('on', this.isReady);
+    this.send({ type:'ready', isReady:this.isReady });
+  },
+
+  leave() {
+    this.isReady = false;
+    if (this.ws) { try{this.ws.close();}catch(e){} this.ws = null; }
+    showScr('slobby');
+  },
+
+  toLobby() {
+    this.st = null; this.sel = null; this.isReady = false;
+    if (this.ws) { try{this.ws.close();}catch(e){} this.ws = null; }
+    showScr('slobby');
+  },
+
+  // ── ОТКРЫТИЕ КАРТЫ ────────────────────────────────────────────
+  showReveal() {
+    const rc = this.st.revealCard;
+    document.getElementById('rv-rank').textContent = rc.rank;
+    document.getElementById('rv-suit').textContent = rc.suit;
+    const isMe = this.st.firstPlayer === this.myIdx;
+    document.getElementById('rv-desc').textContent = isMe
+      ? 'Вы ходите первым!'
+      : `${this.st.players[this.st.firstPlayer]?.name ?? 'Оппонент'} ходит первым`;
+    showScr('sreveal');
+  },
+
+  confirmReveal() {
+    this.send({ type:'reveal_done' });
+  },
+
+  // ── ОБРАБОТКА СОБЫТИЙ (АНИМАЦИИ) ─────────────────────────────
+  handleEvent(ev) {
+    if (ev.type === 'play') {
+      const isMine = ev.playerIdx === this.myIdx;
+      const att    = ev.tableTopWas || null;
+      const def    = ev.card;
+
+      // Оверлей
+      let lbl = '';
+      if (isDPlus(def))       lbl = 'Д+ — бьёт всё!';
+      else if (def.rank==='8') lbl = '8 — переворот';
+      else if (def.rank==='6') lbl = '6 — переворот направления';
+      else if (att)            lbl = isMine ? 'Вы покрыли' : 'Оппонент покрыл';
+      else                     lbl = isMine ? 'Ваш ход'    : 'Ход оппонента';
+      showCoverOverlay(att, def, lbl);
+
+      // Летящая карта
+      this.animFly(ev, isMine);
+
+      // Сброс в биту
+      if (ev.effect?.beatAll || ev.flushed) {
+        const cls = ev.effect?.beatAll ? 'mega-flush' : 'flush-out';
+        setTimeout(() => {
+          document.querySelectorAll('#table-inner .card').forEach(c => c.classList.add(cls));
+        }, 290);
+      }
+      // Переворот стрелки
+      if (ev.effect?.flip) {
+        setTimeout(() => this.animDir(), 370);
+      }
+
+    } else if (ev.type === 'pickup') {
+      setTimeout(() => {
+        document.querySelectorAll('#table-inner .card').forEach(c => c.classList.add('pickup-out'));
+      }, 60);
+    }
+  },
+
+  animFly(ev, isMine) {
+    const cw  = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cw')) || 64;
+    const ch  = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ch')) || 90;
+    const ta  = document.querySelector('.table-area');
+    const tr  = ta ? ta.getBoundingClientRect() : {left:window.innerWidth/2-32,top:window.innerHeight/2-45,width:64,height:90};
+    const dx  = tr.left + tr.width/2  - cw/2;
+    const dy  = tr.top  + tr.height/2 - ch/2;
+
+    let sx, sy;
+    if (isMine && this.sel !== null) {
+      const cards = document.querySelectorAll('#hand-scroll .card');
+      const el    = cards[this.sel];
+      if (el) { const r = el.getBoundingClientRect(); sx = r.left; sy = r.top; }
+      else     { sx = dx; sy = window.innerHeight + ch; }
+    } else {
+      sx = tr.left + tr.width/2 - cw/2;
+      sy = ev.playerIdx < this.myIdx ? -ch : window.innerHeight + ch;
+    }
+
+    const fly = document.createElement('div');
+    fly.className = `fly-card ${cardCls(ev.card)}`;
+    fly.innerHTML = `<div class="ck">${ev.card.rank}</div><div class="cs">${ev.card.suit}</div>`;
+    fly.style.cssText = `left:${sx}px; top:${sy}px;`;
+    document.body.appendChild(fly);
+
+    requestAnimationFrame(() => {
+      fly.style.transition = 'transform .26s cubic-bezier(.2,0,.2,1)';
+      fly.style.transform  = `translate(${dx-sx}px, ${dy-sy}px)`;
+      setTimeout(() => {
+        fly.remove();
+        // Вспышка на верхней карте стола при покрытии
+        if (ev.tableTopWas && !ev.effect?.beatAll && !ev.flushed) {
+          const tcs = document.querySelectorAll('#table-inner .card');
+          if (tcs.length) tcs[tcs.length-1].classList.add('cglow');
+        }
+        this.sel = null;
+      }, 290);
+    });
+  },
+
+  animDir() {
+    const el = document.getElementById('g-dir');
+    el.classList.remove('dir-flip');
+    void el.offsetWidth;
+    el.classList.add('dir-flip');
+    el.addEventListener('animationend', () => el.classList.remove('dir-flip'), {once:true});
+  },
+
+  // ── РЕНДЕР ИГРЫ ───────────────────────────────────────────────
+  renderGame() {
+    if (!this.st) return;
+    showScr('sgame');
+    const s    = this.st;
+    const isMe = s.currentPlayer === this.myIdx;
+
+    document.getElementById('g-who').textContent = isMe ? 'Вы' : (s.players[s.currentPlayer]?.name ?? '?');
+    document.getElementById('g-dir').textContent = s.direction === -1 ? '↺' : '↻';
+    document.getElementById('g-pile').textContent = s.pile > 0 ? `Бита: ${s.pile}` : '';
+    document.getElementById('t-badge').classList.toggle('on', isMe);
+
+    this.renderOpponents();
+    this.renderTable();
+    this.renderHand();
+    this.renderActions();
+  },
+
+  renderOpponents() {
+    const s      = this.st;
+    const others = s.players.map((p,i) => ({...p,i})).filter(p => p.i !== this.myIdx);
+    document.getElementById('opp-area').innerHTML = others.map(p => {
+      const cnt  = (s.hands[p.i] || []).filter(Boolean).length;
+      const isCur = s.currentPlayer === p.i;
+      const fans  = Array.from({length: Math.min(cnt, 12)}, () => `<div class="opp-mini"></div>`).join('');
+      return `<div class="opp-wrap">
+        <div class="opp-cnt">${cnt} карт</div>
+        <div class="opp-fan">${fans}</div>
+        <div class="opp-av${isCur?' cur':''}">${(p.name||'?')[0]}</div>
+      </div>`;
+    }).join('');
+  },
+
+  renderTable() {
+    const s  = this.st;
+    const ti = document.getElementById('table-inner');
+    if (!s.table || s.table.length === 0) {
+      ti.innerHTML = '<div class="empty-msg">— стол пуст —</div>';
+      return;
+    }
+    ti.innerHTML = s.table.map(c =>
+      `<div class="card on-table ${cardCls(c)}">
+        <div class="ck">${c.rank}</div><div class="cs">${c.suit}</div>
+      </div>`
+    ).join('');
+  },
+
+  renderHand() {
+    const s     = this.st;
+    const hand  = s.hands[this.myIdx] || [];
+    const isMe  = s.currentPlayer === this.myIdx;
+    const att   = s.table?.length > 0 ? s.table[s.table.length-1] : null;
+
+    document.getElementById('hand-scroll').innerHTML = hand.map((c, i) => {
+      if (!c) return '';
+      const playable = isMe ? canPlay(att, c) : false;
+      const dimCls   = isMe && !playable ? 'dim' : '';
+      const selCls   = this.sel === i ? 'sel' : '';
+      return `<div class="card hand ${cardCls(c)} ${dimCls} ${selCls}" onclick="G.selCard(${i})">
+        <div class="ck">${c.rank}</div><div class="cs">${c.suit}</div>
+      </div>`;
+    }).join('');
+
+    document.getElementById('hand-cnt').textContent = `${hand.filter(Boolean).length} карт`;
+  },
+
+  renderActions() {
+    const s    = this.st;
+    const isMe = s.currentPlayer === this.myIdx;
+    const row  = document.getElementById('act-row');
+    if (!isMe) { row.innerHTML = ''; return; }
+
+    const canPlayCard = this.sel !== null;
+    const canPickup   = s.table?.length > 0;
+    row.innerHTML = `
+      <button class="act-btn${canPlayCard?' pri':''}" ${canPlayCard?'':'disabled'} onclick="G.doPlay()">Сыграть</button>
+      ${canPickup ? `<button class="act-btn" onclick="G.doPickup()">Поднять</button>` : ''}`;
+  },
+
+  selCard(i) {
+    if (!this.st || this.st.currentPlayer !== this.myIdx) return;
+    this.sel = (this.sel === i) ? null : i;
+    this.renderHand();
+    this.renderActions();
+  },
+
+  doPlay() {
+    if (this.sel === null) return;
+    this.send({ type:'play', cardIndex:this.sel });
+  },
+
+  doPickup() {
+    this.send({ type:'pickup' });
+  },
+
+  // ── КОНЕЦ ИГРЫ ────────────────────────────────────────────────
+  showGameOver() {
+    const s   = this.st;
+    showScr('sgameover');
+    const res = document.getElementById('go-res');
+    const sub = document.getElementById('go-sub');
+    if (s.loser === null) {
+      res.textContent = 'Ничья';
+      res.className   = 'go-res';
+      sub.textContent = '';
+    } else if (s.loser === this.myIdx) {
+      res.textContent = 'Поражение';
+      res.className   = 'go-res lose';
+      sub.textContent = `У вас осталось ${(s.hands[this.myIdx]||[]).filter(Boolean).length} карт`;
+    } else {
+      res.textContent = 'Победа';
+      res.className   = 'go-res win';
+      sub.textContent = `${s.players[s.loser]?.name??'Оппонент'} остался с картами`;
+    }
+  },
+};
+
+G.init();
+</script>
+</body>
+</html>
